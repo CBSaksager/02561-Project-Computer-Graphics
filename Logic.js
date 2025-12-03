@@ -24,6 +24,44 @@ async function main() {
     code: wgslcode,
   });
 
+  // Segway orientation state
+  let orientation = { 
+    side: 0, 
+    front: 0 
+  };
+
+  // Device orientation
+  window.addEventListener('deviceorientation', handleOrientation);
+  function handleOrientation(event){
+    // Placeholder for future device orientation handling logic
+    const beta = event.beta;   // Rotation around x-axis
+    const gamma = event.gamma; // Rotation around y-axis
+
+    orientation.front = beta;
+    orientation.side = gamma;
+  }
+
+  // Keyboard controls
+  window.addEventListener('keydown', handleKeyDown);
+  function handleKeyDown(event) {
+    const step = 2.5; // degrees per key press
+
+    switch (event.key) {
+      case 'ArrowUp':
+        orientation.front += step;
+        break;
+      case 'ArrowDown':
+        orientation.front -= step;
+        break;
+      case 'ArrowLeft':
+        orientation.side -= step;
+        break;
+      case 'ArrowRight':
+        orientation.side += step;
+        break;
+    }
+  }
+
   // Render Pipeline
     const pipeline = device.createRenderPipeline({
     layout: 'auto',
@@ -45,11 +83,21 @@ async function main() {
     },
   });
 
+  // Temp orientation test function to change background color based on orientation
+  function getBackgroundColor() {
+    const r = (orientation.front + 180) / 360; // Front controls red - Normalize to [0,1]
+    const g = (orientation.side + 90) / 180;   // Side controls green - Normalize to [0,1]
+    const b = 0.5; // Fixed blue component
+    const a = 1.0; // Fully opaque
 
-  // Temp background color
-  const bgColor = { r: 0.7, g: 0.3, b: 0.0, a: 1.0 };
+    const bgColor = { r: r, g: g, b: b, a: a };
+    return bgColor;
+  }
+
   // Render function
   function render() {
+    const bgColor = getBackgroundColor();
+
     const encoder = device.createCommandEncoder();
     const pass = encoder.beginRenderPass({
       colorAttachments: [
@@ -67,6 +115,8 @@ async function main() {
     pass.end();
 
     device.queue.submit([encoder.finish()]);
+
+    requestAnimationFrame(render);
   }
 
   render();
