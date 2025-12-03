@@ -25,21 +25,26 @@ async function main() {
   });
 
   // Segway orientation state
-  let orientation = { 
-    side: 0, 
-    front: 0 
+  let orientation = {
+    side: 0,
+    front: 0
   };
 
   // Device orientation
   window.addEventListener('deviceorientation', handleOrientation);
-  function handleOrientation(event){
-    // Placeholder for future device orientation handling logic
-    const beta = event.beta;   // Rotation around x-axis
-    const gamma = event.gamma; // Rotation around y-axis
+  function handleOrientation(event) {
+    console.log(event);
 
-    orientation.front = beta;
-    orientation.side = gamma;
+    document.getElementById('orientation-text').textContent = `alpha: ${event.alpha?.toFixed(2)}, beta: ${event.beta?.toFixed(2)}, gamma: ${event.gamma?.toFixed(2)}`;
+
+    orientation.front = event.beta;
+    orientation.side = event.alpha;
   }
+
+  // window.addEventListener('deviceorientationabsolute', (event) => {
+  //   console.log('absolute', event);
+  //   document.getElementById('orientation-text').textContent = `alpha: ${event.alpha?.toFixed(2)}, beta: ${event.beta?.toFixed(2)}, gamma: ${event.gamma?.toFixed(2)}`;
+  // });
 
   // Keyboard controls
   window.addEventListener('keydown', handleKeyDown);
@@ -63,7 +68,7 @@ async function main() {
   }
 
   // Render Pipeline
-    const pipeline = device.createRenderPipeline({
+  const pipeline = device.createRenderPipeline({
     layout: 'auto',
     vertex: {
       module: wgsl,
@@ -85,8 +90,8 @@ async function main() {
 
   // Temp orientation test function to change background color based on orientation
   function getBackgroundColor() {
-    const r = (orientation.front + 180) / 360; // Front controls red - Normalize to [0,1]
-    const g = (orientation.side + 90) / 180;   // Side controls green - Normalize to [0,1]
+    const r = (orientation.front + 90) / 180; // Front controls red - Normalize to [0,1]
+    const g = (orientation.side + 180) / 360;   // Side controls green - Normalize to [0,1]
     const b = 0.5; // Fixed blue component
     const a = 1.0; // Fully opaque
 
