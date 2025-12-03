@@ -2,18 +2,51 @@
 <html>
 
 <head>
-    <title>Sygeste Segway Spil</title>
-    <script type="text/javascript" src="MV.js"></script>
-    <script type="text/javascript" src="Logic.js"></script>
+  <title>W09P02</title>
+  <script type="text/javascript" src="MV.js"></script>
+  <script type="text/javascript" src="OBJParser.js"></script>
+  <script type="text/javascript" src="w09p02.js"></script>
+  <script id="wgsl" type="x-shader" src="w09p02.wgsl"></script>
 </head>
 
-<script id="wgsl" type="x-shader" src="Shader.wgsl"></script>
-
 <body>
+  <div class="flex">
     <canvas id="my-canvas" width="512" height="512">
+      Please use a browser that supports HTML5 canvas.
     </canvas>
-    <p id="orientation-text"></p>
+    <p id="orientation-text">Orientation...</p>
+    <div>
+      <div>
+        <p>Emitted radiance L_e:</p>
+        <div>
+          0.0<input type="range" id="emitted-radiance" min="0.0" max="2.0" value="1.0" step="0.01">2.0
+        </div>
+      </div>
+      <div>
+        <p>Ambient radiance L_a:</p>
+        <div>
+          0.0<input type="range" id="ambient-radiance" min="0.0" max="1.0" value="0.0" step="0.01">1.0
+        </div>
+      </div>
+      <div>
+        <p>Diffuse coefficient k_d:</p>
+        <div>
+          0.0<input type="range" id="diffuse" min="0.0" max="1.0" value="1.0" step="0.01">1.0
+        </div>
+      </div>
+      <div>
+        <p>Specular coefficient k_s:</p>
+        <div class="flex">
+          0.0<input type="range" id="specular" min="0.0" max="1.0" value="1.0" step="0.01">1.0
+        </div>
+      </div>
+      <div>
+        <p>Shininess s:</p>
+        <div>
+          0.0<input type="range" id="shininess" min="0.0" max="1.0e3" value="120.0" step="0.01">1.0e3
+        </div>
+      </div>
+    </div>
 </body>
-Hello World!
 
 </html>
