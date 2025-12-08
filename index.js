@@ -53,11 +53,6 @@ async function main() {
         orientation.side = event.alpha;
     }
 
-    // window.addEventListener('deviceorientationabsolute', (event) => {
-    //   console.log('absolute', event);
-    //   document.getElementById('orientation-text').textContent = `alpha: ${event.alpha?.toFixed(2)}, beta: ${event.beta?.toFixed(2)}, gamma: ${event.gamma?.toFixed(2)}`;
-    // });
-
     // Keyboard controls
     window.addEventListener('keydown', handleKeyDown);
     function handleKeyDown(event) {
@@ -79,7 +74,6 @@ async function main() {
         }
     }
 
-
     // SHARED
     const positionBufferLayout = {
         arrayStride: sizeof['vec4'],
@@ -89,7 +83,6 @@ async function main() {
             shaderLocation: 0,
         }],
     };
-
 
     // TEAPOT
     const obj_filename = "teapot.obj";
@@ -156,7 +149,6 @@ async function main() {
         0, 1, 2,
         0, 2, 3,
     ]);
-
 
     const groundPositionBuffer = device.createBuffer({
         size: sizeof['vec3'] * positionsGround.length,
@@ -242,19 +234,9 @@ async function main() {
         0.0, 0.0, 0.0, 1.0
     )
 
-    const center = translate(0, 0, 0);
-    const M = center;
-
-
     const fov = 90;
     let projection = perspective(fov, canvas.width / canvas.height, 1, 20);
     projection = mult(Mst, projection);
-
-    const V = mat4();
-    const mvp = mult(projection, mult(V, M));
-
-    device.queue.writeBuffer(groundUniformBuffer, 0, flatten(mvp));
-    device.queue.writeBuffer(groundUniformBuffer, sizeof['mat4'] * 2, new Float32Array([0.0, 0.0, 0.0, 1.0])); // eye, visibility
 
     const wgslfile = document.getElementById('wgsl').src;
     const wgslcode
@@ -385,14 +367,7 @@ async function main() {
     const lightRadius = 2.0;
     let lightPos = vec3(lightRadius * Math.sin(lightAngle), 2, -2 + lightRadius * Math.cos(lightAngle));
 
-    let teapotY = -0.5;
-    let M_teapot = mult(translate(0, teapotY, -3), scalem(0.25, 0.25, 0.25));
-    let mvp_teapot = mult(projection, mult(V, M_teapot));
-    const eye = vec3(0, 0, 0);
-
-    let mvpShadow = computeShadowMatrix();
-
-    function computeShadowMatrix() {
+    function computeShadowMatrix(V, M) {
         const epsilon = 0.0001;
         const l = lightPos;
         const n = vec3(0, 1, 0);
@@ -406,20 +381,41 @@ async function main() {
             -n[0], -n[1], -n[2], a - d
         );
 
-        const mvpShadow = mult(projection, mult(V, mult(Mshadow, M_teapot)));
+        const mvpShadow = mult(projection, mult(V, mult(Mshadow, M)));
         return mvpShadow;
     }
 
-    //TODO: Cleanup
     function updateUniforms() {
+        //TODO: Update eye point based on forward movement
+        const eye = vec3(0, 0, 0);
+        const up = vec3(0, 1, 0);
+
+        // Update view matrix based on orientation
+        const rotationMatrix = rotateY(-orientation.side);
+        const lookAtPoint = mult(rotationMatrix, vec4(0, 0, -1, 0));
+        const V = lookAt(eye, vec3(lookAtPoint[0], lookAtPoint[1], lookAtPoint[2]), up);
+
+        const mvpGround = mult(projection, mult(V, mat4()));
+
+        let teapotY = -0.5;
+        let mTeapot = mult(translate(0, teapotY, -3), scalem(0.25, 0.25, 0.25));
+        let mvpTeapot = mult(projection, mult(V, mTeapot));
+
+        const mvpShadow = computeShadowMatrix(V, mTeapot);
+
         const options = getOptions();
+
+        device.queue.writeBuffer(groundUniformBuffer, 0, flatten(mvpGround));
+        device.queue.writeBuffer(groundUniformBuffer, sizeof['mat4'] * 2, new Float32Array([0.0, 0.0, 0.0, 1.0])); // eye, visibility
+
         const teapotUniforms = new Float32Array([
             ...flatten(eye), 1.0,
             ...flatten(lightPos), options.emittedRadianceSlider,
             options.ambientRadianceSlider, options.diffuseSlider, options.specularSlider, options.shininessSlider,
         ]);
-        device.queue.writeBuffer(teapotUniformBuffer, 0, flatten(mvp_teapot));
-        device.queue.writeBuffer(teapotUniformBuffer, sizeof['mat4'], flatten(M_teapot));
+
+        device.queue.writeBuffer(teapotUniformBuffer, 0, flatten(mvpTeapot));
+        device.queue.writeBuffer(teapotUniformBuffer, sizeof['mat4'], flatten(mTeapot));
         device.queue.writeBuffer(teapotUniformBuffer, sizeof['mat4'] * 2, teapotUniforms);
 
         device.queue.writeBuffer(uniformBufferShadow, 0, flatten(mvpShadow));
@@ -427,21 +423,11 @@ async function main() {
     }
 
     function animate(timestamp) {
-        // if (animateLight) {
-        //     updateLightPosition(timestamp);
-        // }
-        // if (animateTeapot) {
-        //     updateTeatpotPosition(timestamp);
-        // }
-        // if (animateLight || animateTeapot) {
-        //     mvpShadow = computeShadowMatrix();
-        // }
         // lastTime = timestamp;
         updateUniforms();
+        console.log("render");
         render();
-        // if (animateLight || animateTeapot) {
-        //     requestAnimationFrame(animate);
-        // }
+        requestAnimationFrame(animate);
     }
 
     function render() {
@@ -491,12 +477,7 @@ async function main() {
         device.queue.submit([encoder.finish()]);
     }
 
-    setupInputListeners(() => {
-        // if (!(animateLight || animateTeapot)) {
-        //     requestAnimationFrame(animate);
-        // }
-        requestAnimationFrame(animate);
-    });
+    // Start render loop
     requestAnimationFrame(animate);
 }
 
