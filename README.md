@@ -1,3 +1,6 @@
+# Notes
+https://web.dev/articles/device-orientation#earth_coordinate_frame
+
 # Debugging locally
 Based on this guide: https://developer.chrome.com/docs/web-platform/webgpu/troubleshooting-tips
 
