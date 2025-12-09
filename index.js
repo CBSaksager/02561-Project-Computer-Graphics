@@ -55,19 +55,16 @@ async function main() {
 
     function speedToPosition(speed) {
         const maxSpeed = 0.05; // units per frame
-
         return speed * maxSpeed;
     }
 
     // Device orientation
     window.addEventListener('deviceorientation', handleOrientation);
     function handleOrientation(event) {
-        console.log(event);
-
         document.getElementById('orientation-text').textContent = `alpha: ${event.alpha?.toFixed(2)}, beta: ${event.beta?.toFixed(2)}, gamma: ${event.gamma?.toFixed(2)}`;
 
         orientation.front = event.beta;
-        orientation.side = event.alpha;
+        orientation.side = event.alpha + 90;
     }
 
     // Keyboard controls
