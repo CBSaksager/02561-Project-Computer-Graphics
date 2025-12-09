@@ -42,6 +42,23 @@ async function main() {
         front: 0
     };
 
+    // Segway movement
+    function orientationToSpeed(orientation) {
+        // Orientation deadzone
+        const deadzone = 10; // degrees
+        let forward = 0;
+        if (Math.abs(orientation.front) > deadzone) {
+            forward = (orientation.front - Math.sign(orientation.front) * deadzone) / (90 - deadzone);
+        }
+        return forward;
+    }
+
+    function speedToPosition(speed) {
+        const maxSpeed = 0.05; // units per frame
+
+        return speed * maxSpeed;
+    }
+
     // Device orientation
     window.addEventListener('deviceorientation', handleOrientation);
     function handleOrientation(event) {
@@ -61,15 +78,17 @@ async function main() {
         switch (event.key) {
             case 'ArrowUp':
                 orientation.front += step;
+                console.log(orientation.front); // TODO: Remove
                 break;
             case 'ArrowDown':
                 orientation.front -= step;
+                console.log(orientation.front); // TODO: Remove
                 break;
             case 'ArrowLeft':
-                orientation.side -= step;
+                orientation.side += step;
                 break;
             case 'ArrowRight':
-                orientation.side += step;
+                orientation.side -= step;
                 break;
         }
     }
@@ -385,15 +404,24 @@ async function main() {
         return mvpShadow;
     }
 
+    let eye = vec3(0, 0, 0);
+
     function updateUniforms() {
-        //TODO: Update eye point based on forward movement
-        const eye = vec3(0, 0, 0);
         const up = vec3(0, 1, 0);
+        const forwardMovement = orientationToSpeed(orientation);
+
+        // Update eye position based on orientation (maybe move this to a speedToPosition function)
+        const angleRadians = -orientation.side * Math.PI / 180;
+        const forwardX = Math.sin(angleRadians);
+        const forwardZ = -Math.cos(angleRadians);
+        const speed = speedToPosition(forwardMovement);
+        eye[0] += forwardX * speed; // Move left/right
+        eye[2] += forwardZ * speed; // Move forward/backward
 
         // Update view matrix based on orientation
         const rotationMatrix = rotateY(-orientation.side);
         const lookAtPoint = mult(rotationMatrix, vec4(0, 0, -1, 0));
-        const V = lookAt(eye, vec3(lookAtPoint[0], lookAtPoint[1], lookAtPoint[2]), up);
+        const V = lookAt(eye, vec3(eye[0] + lookAtPoint[0], eye[1] + lookAtPoint[1], eye[2] + lookAtPoint[2]), up);
 
         const mvpGround = mult(projection, mult(V, mat4()));
 
@@ -425,13 +453,13 @@ async function main() {
     function animate(timestamp) {
         // lastTime = timestamp;
         updateUniforms();
-        console.log("render");
+        // console.log("render");
         render();
         requestAnimationFrame(animate);
     }
 
     function render() {
-        console.log("Render frame");
+        // console.log("Render frame");
 
         const encoder = device.createCommandEncoder();
         const pass = encoder.beginRenderPass({
