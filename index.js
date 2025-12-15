@@ -120,7 +120,7 @@ async function main() {
             }
         }
 
-        carve(1, 1);
+        carve(1, 1); // Starting cell
         return maze;
     }
 
@@ -259,10 +259,10 @@ async function main() {
 
     // GROUND
     let positionsGround = [
-        vec3(-2, -1, -1),
-        vec3(2, -1, -1),
-        vec3(2, -1, -5),
-        vec3(-2, -1, -5),
+        vec3(0, -0.01, 0),
+        vec3(21, -0.01, 0),
+        vec3(21, -0.01, 21),
+        vec3(0, -0.01, 21),
     ];
 
     let indicesGround = new Uint32Array([
@@ -291,9 +291,9 @@ async function main() {
 
     const groundTexcoords = [
         vec2(0.0, 0.0),
-        vec2(1.0, 0.0),
-        vec2(1.0, 1.0),
-        vec2(0.0, 1.0),
+        vec2(21.0, 0.0),
+        vec2(21.0, 21.0),
+        vec2(0.0, 21.0),
     ];
     const groundTexcoordBuffer = device.createBuffer({
         size: sizeof['vec2'] * groundTexcoords.length,
@@ -329,8 +329,8 @@ async function main() {
     );
 
     groundTexture.sampler = device.createSampler({
-        addressModeU: 'clamp-to-edge',
-        addressModeV: 'clamp-to-edge',
+        addressModeU: 'repeat',
+        addressModeV: 'repeat',
         minFilter: 'linear',
         magFilter: 'linear',
     });
@@ -355,7 +355,7 @@ async function main() {
     )
 
     const fov = 90;
-    let projection = perspective(fov, canvas.width / canvas.height, 1, 20);
+    let projection = perspective(fov, canvas.width / canvas.height, 0.1, 50.0);
     projection = mult(Mst, projection);
 
     const wgslfile = document.getElementById('wgsl').src;
@@ -485,7 +485,8 @@ async function main() {
 
     let lightAngle = 45;
     const lightRadius = 2.0;
-    let lightPos = vec3(lightRadius * Math.sin(lightAngle), 2, -2 + lightRadius * Math.cos(lightAngle));
+    // let lightPos = vec3(lightRadius * Math.sin(lightAngle), 2, -2 + lightRadius * Math.cos(lightAngle));
+    let lightPos = vec3(10.5, 15, 10.5);
 
     function computeShadowMatrix(V, M) {
         const epsilon = 0.0001;
@@ -505,7 +506,8 @@ async function main() {
         return mvpShadow;
     }
 
-    let eye = vec3(1.5, 1, 1.5); // Start in a path cell
+    // let eye = vec3(1.5, 1, 1.5); // Start in cell (1,1)
+    let eye = vec3(10.5, 20, 10.5); // View maze from above
     const collisionRadius = 0.1;
 
     function updateUniforms() {
@@ -531,7 +533,9 @@ async function main() {
 
         // Update view matrix based on orientation
         const rotationMatrix = rotateY(-orientation.side);
-        const lookAtPoint = mult(rotationMatrix, vec4(0, 0, -1, 0));
+        // const lookAtPoint = mult(rotationMatrix, vec4(0, 0, -1, 0));
+        const lookAtPoint = vec4(0, -50, 10, 0); // Look down on maze
+
         const V = lookAt(eye, vec3(eye[0] + lookAtPoint[0], eye[1] + lookAtPoint[1], eye[2] + lookAtPoint[2]), up);
 
         const mvpGround = mult(projection, mult(V, mat4()));
