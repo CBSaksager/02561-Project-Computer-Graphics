@@ -100,23 +100,129 @@ async function main() {
         }],
     };
 
-    // TEAPOT
-    const obj_filename = "teapot.obj";
-    const obj = await readOBJFile(obj_filename, 1, true);
+    // MAZE GENERATION
+    function generateMaze(width, height) {
+        const maze = Array(height).fill().map(() => Array(width).fill(1)); // 1 = wall
 
-    const teapotPositions = obj.vertices;
-    const teapotPositionBuffer = device.createBuffer({
-        size: sizeof['vec4'] * teapotPositions.length,
+        function carve(x, y) {
+            maze[y][x] = 0; // 0 = path
+
+            const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]].sort(() => Math.random() - 0.5);
+
+            for (const [dx, dy] of dirs) {
+                const nx = x + dx * 2;
+                const ny = y + dy * 2;
+
+                if (nx >= 0 && nx < width && ny >= 0 && ny < height && maze[ny][nx] === 1) {
+                    maze[y + dy][x + dx] = 0; // Carve between
+                    carve(nx, ny);
+                }
+            }
+        }
+
+        carve(1, 1);
+        return maze;
+    }
+
+    function addWallBox(vertices, indices, normals, colors, x, y, z, w, h, d) {
+        const baseIndex = vertices.length;
+
+        // 8 vertices of the box
+        const v = [
+            vec4(x, y, z, 1), vec4(x + w, y, z, 1), vec4(x + w, y + h, z, 1), vec4(x, y + h, z, 1),
+            vec4(x, y, z + d, 1), vec4(x + w, y, z + d, 1), vec4(x + w, y + h, z + d, 1), vec4(x, y + h, z + d, 1)
+        ];
+
+        vertices.push(...v);
+
+        // 12 triangles (6 faces * 2 triangles)
+        const faces = [
+            [0, 1, 2], [0, 2, 3], [5, 4, 7], [5, 7, 6], [1, 5, 6], [1, 6, 2],
+            [4, 0, 3], [4, 3, 7], [3, 2, 6], [3, 6, 7], [4, 5, 1], [4, 1, 0]
+        ];
+
+        for (const face of faces) {
+            indices.push(...face.map(i => baseIndex + i));
+        }
+
+        // Add colors and normals for all vertices
+        const color = vec4(0.7, 0.7, 0.7, 1.0);
+        for (let i = 0; i < 8; i++) {
+            colors.push(color);
+            normals.push(vec4(0, 1, 0, 0));
+        }
+    }
+
+    function generateMazeGeometry(maze, cellSize, wallHeight) {
+        const vertices = [];
+        const indices = [];
+        const normals = [];
+        const colors = [];
+
+        for (let y = 0; y < maze.length; y++) {
+            for (let x = 0; x < maze[y].length; x++) {
+                if (maze[y][x] === 1) { // Wall
+                    addWallBox(vertices, indices, normals, colors,
+                        x * cellSize, 0, y * cellSize,
+                        cellSize, wallHeight, cellSize);
+                }
+            }
+        }
+
+        return { vertices, indices, normals, colors };
+    }
+
+    // Grid-based collision detection
+    const cellSize = 1;
+    const maze = generateMaze(21, 21);
+
+    function checkMazeCollision(position, radius) {
+        const gridX = Math.floor(position[0] / cellSize);
+        const gridZ = Math.floor(position[2] / cellSize);
+
+        // Check nearby cells
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                const cx = gridX + dx;
+                const cy = gridZ + dy;
+
+                if (cx >= 0 && cx < maze[0].length && cy >= 0 && cy < maze.length) {
+                    if (maze[cy][cx] === 1) { // Wall
+                        const cellX = cx * cellSize;
+                        const cellZ = cy * cellSize;
+
+                        const closestX = Math.max(cellX, Math.min(position[0], cellX + cellSize));
+                        const closestZ = Math.max(cellZ, Math.min(position[2], cellZ + cellSize));
+
+                        const distX = position[0] - closestX;
+                        const distZ = position[2] - closestZ;
+                        const distSq = distX * distX + distZ * distZ;
+
+                        if (distSq < radius * radius) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    // Generate maze geometry
+    const mazeGeometry = generateMazeGeometry(maze, cellSize, 2.0);
+
+    // MAZE
+    const mazePositionBuffer = device.createBuffer({
+        size: sizeof['vec4'] * mazeGeometry.vertices.length,
         usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     });
-    device.queue.writeBuffer(teapotPositionBuffer, 0, flatten(teapotPositions));
+    device.queue.writeBuffer(mazePositionBuffer, 0, flatten(mazeGeometry.vertices));
 
-    const teapotColors = obj.colors;
-    const teapotColorBuffer = device.createBuffer({
-        size: sizeof['vec4'] * teapotColors.length,
+    const mazeColorBuffer = device.createBuffer({
+        size: sizeof['vec4'] * mazeGeometry.colors.length,
         usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     });
-    const teapotColorBufferLayout = {
+    const mazeColorBufferLayout = {
         arrayStride: sizeof['vec4'],
         attributes: [{
             format: 'float32x4',
@@ -124,14 +230,13 @@ async function main() {
             shaderLocation: 1,
         }],
     };
-    device.queue.writeBuffer(teapotColorBuffer, 0, flatten(teapotColors));
+    device.queue.writeBuffer(mazeColorBuffer, 0, flatten(mazeGeometry.colors));
 
-    const teapotNormals = obj.normals;
-    const teapotNormalBuffer = device.createBuffer({
-        size: sizeof['vec4'] * teapotNormals.length,
+    const mazeNormalBuffer = device.createBuffer({
+        size: sizeof['vec4'] * mazeGeometry.normals.length,
         usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     });
-    const teapotNormalBufferLayout = {
+    const mazeNormalBufferLayout = {
         arrayStride: sizeof['vec4'],
         attributes: [{
             format: 'float32x4',
@@ -139,16 +244,15 @@ async function main() {
             shaderLocation: 2,
         }],
     };
-    device.queue.writeBuffer(teapotNormalBuffer, 0, flatten(teapotNormals));
+    device.queue.writeBuffer(mazeNormalBuffer, 0, flatten(mazeGeometry.normals));
 
-    const teapotIndices = obj.indices;
-    const teapotIndicesBuffer = device.createBuffer({
-        size: sizeof['vec4'] * teapotIndices.length,
+    const mazeIndicesBuffer = device.createBuffer({
+        size: Uint32Array.BYTES_PER_ELEMENT * mazeGeometry.indices.length,
         usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
     });
-    device.queue.writeBuffer(teapotIndicesBuffer, 0, teapotIndices);
+    device.queue.writeBuffer(mazeIndicesBuffer, 0, new Uint32Array(mazeGeometry.indices));
 
-    const teapotUniformBuffer = device.createBuffer({
+    const mazeUniformBuffer = device.createBuffer({
         size: sizeof['mat4'] * 2 + sizeof['vec4'] * 4,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
@@ -288,12 +392,12 @@ async function main() {
         },
     });
 
-    const teapotPipeline = device.createRenderPipeline({
+    const mazePipeline = device.createRenderPipeline({
         layout: 'auto',
         vertex: {
             module: wgsl,
             entryPoint: 'main_vs_teapot',
-            buffers: [positionBufferLayout, teapotColorBufferLayout, teapotNormalBufferLayout],
+            buffers: [positionBufferLayout, mazeColorBufferLayout, mazeNormalBufferLayout],
         },
         fragment: {
             module: wgsl,
@@ -363,10 +467,10 @@ async function main() {
         ],
     });
 
-    const teapotBindGroup = device.createBindGroup({
-        layout: teapotPipeline.getBindGroupLayout(0),
+    const mazeBindGroup = device.createBindGroup({
+        layout: mazePipeline.getBindGroupLayout(0),
         entries: [
-            { binding: 0, resource: { buffer: teapotUniformBuffer } },
+            { binding: 0, resource: { buffer: mazeUniformBuffer } },
         ],
     });
 
@@ -401,7 +505,8 @@ async function main() {
         return mvpShadow;
     }
 
-    let eye = vec3(0, 0, 0);
+    let eye = vec3(1.5, 1, 1.5); // Start in a path cell
+    const collisionRadius = 0.1;
 
     function updateUniforms() {
         const up = vec3(0, 1, 0);
@@ -412,8 +517,17 @@ async function main() {
         const forwardX = Math.sin(angleRadians);
         const forwardZ = -Math.cos(angleRadians);
         const speed = speedToPosition(forwardMovement);
-        eye[0] += forwardX * speed; // Move left/right
-        eye[2] += forwardZ * speed; // Move forward/backward
+
+        const newEye = vec3(
+            eye[0] + forwardX * speed,
+            eye[1],
+            eye[2] + forwardZ * speed
+        );
+
+        // Check collision before updating position
+        if (!checkMazeCollision(newEye, collisionRadius)) {
+            eye = newEye;
+        }
 
         // Update view matrix based on orientation
         const rotationMatrix = rotateY(-orientation.side);
@@ -422,26 +536,25 @@ async function main() {
 
         const mvpGround = mult(projection, mult(V, mat4()));
 
-        let teapotY = -0.5;
-        let mTeapot = mult(translate(0, teapotY, -3), scalem(0.25, 0.25, 0.25));
-        let mvpTeapot = mult(projection, mult(V, mTeapot));
+        const mMaze = mat4();
+        let mvpMaze = mult(projection, mult(V, mMaze));
 
-        const mvpShadow = computeShadowMatrix(V, mTeapot);
+        const mvpShadow = computeShadowMatrix(V, mMaze);
 
         const options = getOptions();
 
         device.queue.writeBuffer(groundUniformBuffer, 0, flatten(mvpGround));
         device.queue.writeBuffer(groundUniformBuffer, sizeof['mat4'] * 2, new Float32Array([0.0, 0.0, 0.0, 1.0])); // eye, visibility
 
-        const teapotUniforms = new Float32Array([
+        const mazeUniforms = new Float32Array([
             ...flatten(eye), 1.0,
             ...flatten(lightPos), options.emittedRadianceSlider,
             options.ambientRadianceSlider, options.diffuseSlider, options.specularSlider, options.shininessSlider,
         ]);
 
-        device.queue.writeBuffer(teapotUniformBuffer, 0, flatten(mvpTeapot));
-        device.queue.writeBuffer(teapotUniformBuffer, sizeof['mat4'], flatten(mTeapot));
-        device.queue.writeBuffer(teapotUniformBuffer, sizeof['mat4'] * 2, teapotUniforms);
+        device.queue.writeBuffer(mazeUniformBuffer, 0, flatten(mvpMaze));
+        device.queue.writeBuffer(mazeUniformBuffer, sizeof['mat4'], flatten(mMaze));
+        device.queue.writeBuffer(mazeUniformBuffer, sizeof['mat4'] * 2, mazeUniforms);
 
         device.queue.writeBuffer(uniformBufferShadow, 0, flatten(mvpShadow));
         device.queue.writeBuffer(uniformBufferShadow, sizeof['mat4'] * 2, new Float32Array([0.0, 0.0, 0.0, 0.0]));
@@ -486,17 +599,17 @@ async function main() {
 
         // Draw shadows
         pass.setPipeline(pipelineShadows);
-        pass.setIndexBuffer(teapotIndicesBuffer, 'uint32');
-        pass.setVertexBuffer(0, teapotPositionBuffer);
+        pass.setIndexBuffer(mazeIndicesBuffer, 'uint32');
+        pass.setVertexBuffer(0, mazePositionBuffer);
         pass.setBindGroup(0, bindGroupShadows);
-        pass.drawIndexed(teapotIndices.length);
+        pass.drawIndexed(mazeGeometry.indices.length);
 
-        // Draw teapot
-        pass.setPipeline(teapotPipeline);
-        pass.setVertexBuffer(1, teapotColorBuffer);
-        pass.setVertexBuffer(2, teapotNormalBuffer);
-        pass.setBindGroup(0, teapotBindGroup);
-        pass.drawIndexed(teapotIndices.length);
+        // Draw maze
+        pass.setPipeline(mazePipeline);
+        pass.setVertexBuffer(1, mazeColorBuffer);
+        pass.setVertexBuffer(2, mazeNormalBuffer);
+        pass.setBindGroup(0, mazeBindGroup);
+        pass.drawIndexed(mazeGeometry.indices.length);
 
         pass.end();
         device.queue.submit([encoder.finish()]);
