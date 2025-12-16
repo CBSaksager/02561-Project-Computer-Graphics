@@ -12,6 +12,13 @@ async function main() {
         format: canvasFormat,
     });
 
+    // Update canvas size to match display size
+    function updateCanvasSize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    updateCanvasSize();
+
     // Segway orientation state
     let orientation = {
         side: 0,
@@ -35,10 +42,6 @@ async function main() {
     function handleOrientation(event) {
         const { alpha, beta, gamma } = event;
         const { forward, right, up } = getEulerAngles(getRotationMatrix(alpha, beta, gamma));
-
-        let text = `alpha: ${event.alpha?.toFixed(2)}, beta: ${event.beta?.toFixed(2)}, gamma: ${event.gamma?.toFixed(2)}`;
-        text += ` \nforward: ${forward.toFixed(2)}, side: ${right.toFixed(2)}, up: ${up.toFixed(2)}`;
-        document.getElementById('orientation-text').textContent = text;
 
         orientation.front = right;
         orientation.side = up;

@@ -7,14 +7,21 @@
   <script type="text/javascript" src="OBJParser.js"></script>
   <script type="text/javascript" src="index.js"></script>
   <script id="wgsl" type="x-shader" src="shader.wgsl"></script>
+  <style>
+    #my-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      right: 0;
+    }
+  </style>
 </head>
 
 <body>
-  <div class="flex">
-    <canvas id="my-canvas" width="512" height="512">
-      Please use a browser that supports HTML5 canvas.
-    </canvas>
-    <p id="orientation-text">Orientation...</p>
+  <canvas id="my-canvas">
+    Please use a browser that supports HTML5 canvas.
+  </canvas>
 </body>
 
 </html>
