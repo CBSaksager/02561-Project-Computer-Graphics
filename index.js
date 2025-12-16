@@ -12,6 +12,13 @@ async function main() {
         format: canvasFormat,
     });
 
+    // Update canvas size to match display size
+    function updateCanvasSize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    updateCanvasSize();
+
     // Segway orientation state
     let orientation = {
         side: 0,
@@ -35,10 +42,6 @@ async function main() {
     function handleOrientation(event) {
         const { alpha, beta, gamma } = event;
         const { forward, right, up } = getEulerAngles(getRotationMatrix(alpha, beta, gamma));
-
-        let text = `alpha: ${event.alpha?.toFixed(2)}, beta: ${event.beta?.toFixed(2)}, gamma: ${event.gamma?.toFixed(2)}`;
-        text += ` \nforward: ${forward.toFixed(2)}, side: ${right.toFixed(2)}, up: ${up.toFixed(2)}`;
-        document.getElementById('orientation-text').textContent = text;
 
         orientation.front = right;
         orientation.side = up;
@@ -96,7 +99,6 @@ async function main() {
         }
     }
 
-    // SHARED
     const positionBufferLayout = {
         arrayStride: sizeof['vec4'],
         attributes: [{
@@ -174,7 +176,13 @@ async function main() {
         // Add colors and normals for all 24 vertices
         for (let i = 0; i < 24; i++) {
             colors.push(vec4(1.0, 1.0, 1.0, 1.0));
-            normals.push(vec4(0, 1, 0, 0));
+            // Normals (approximate per face)
+            if (i < 4) normals.push(vec4(0, 0, -1, 0));          // Front
+            else if (i < 8) normals.push(vec4(0, 0, 1, 0));      // Back
+            else if (i < 12) normals.push(vec4(1, 0, 0, 0));     // Right
+            else if (i < 16) normals.push(vec4(-1, 0, 0, 0));    // Left
+            else if (i < 20) normals.push(vec4(0, 1, 0, 0));     // Top
+            else normals.push(vec4(0, -1, 0, 0));                // Bottom
         }
     }
 
@@ -258,25 +266,11 @@ async function main() {
     });
     device.queue.writeBuffer(mazePositionBuffer, 0, flatten(mazeGeometry.vertices));
 
-    const mazeColorBuffer = device.createBuffer({
-        size: sizeof['vec4'] * mazeGeometry.colors.length,
-        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    });
-    const mazeColorBufferLayout = {
-        arrayStride: sizeof['vec4'],
-        attributes: [{
-            format: 'float32x4',
-            offset: 0,
-            shaderLocation: 1,
-        }],
-    };
-    device.queue.writeBuffer(mazeColorBuffer, 0, flatten(mazeGeometry.colors));
-
     const mazeNormalBuffer = device.createBuffer({
         size: sizeof['vec4'] * mazeGeometry.normals.length,
         usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     });
-    const mazeNormalBufferLayout = {
+    const normalBufferLayout = {
         arrayStride: sizeof['vec4'],
         attributes: [{
             format: 'float32x4',
@@ -303,12 +297,12 @@ async function main() {
     });
     device.queue.writeBuffer(mazeTexcoordBuffer, 0, flatten(mazeGeometry.texcoords));
 
-    const mazeTexcoordBufferLayout = {
+    const texcoordBufferLayout = {
         arrayStride: sizeof['vec2'],
         attributes: [{
             format: 'float32x2',
             offset: 0,
-            shaderLocation: 3,
+            shaderLocation: 1,
         }],
     };
 
@@ -359,9 +353,20 @@ async function main() {
         attributes: [{
             format: 'float32x2',
             offset: 0,
-            shaderLocation: 3,
+            shaderLocation: 1,
         }],
     };
+
+    const groundNormals = [
+        vec4(0, 1, 0, 0),
+        vec4(0, 1, 0, 0),
+        vec4(0, 1, 0, 0),
+        vec4(0, 1, 0, 0),
+    ];
+    const groundNormalBuffer = device.createBuffer({
+        size: sizeof['vec4'] * groundNormals.length,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
 
     device.queue.writeBuffer(groundPositionBuffer, 0, flatten(positionsGround));
     device.queue.writeBuffer(groundIndicesBuffer, 0, indicesGround);
@@ -413,7 +418,7 @@ async function main() {
         magFilter: 'linear',
     });
 
-    const bgcolor = vec4(0.3921, 0.5843, 0.9294, 1.0) // Cornflower
+    const bgcolor = vec4(0, 0, 0, 1.0)
 
     const groundUniformBuffer = device.createBuffer({
         size: sizeof['mat4'] * 2 + sizeof['vec4'] * 4,
@@ -445,7 +450,7 @@ async function main() {
         vertex: {
             module: wgsl,
             entryPoint: 'main_vs_texture',
-            buffers: [groundPositionBufferLayout, groundTexcoordBufferLayout],
+            buffers: [groundPositionBufferLayout, texcoordBufferLayout, normalBufferLayout],
         },
         fragment: {
             module: wgsl,
@@ -470,7 +475,7 @@ async function main() {
         vertex: {
             module: wgsl,
             entryPoint: 'main_vs_texture',
-            buffers: [positionBufferLayout, mazeTexcoordBufferLayout],
+            buffers: [positionBufferLayout, texcoordBufferLayout, normalBufferLayout],
         },
         fragment: {
             module: wgsl,
@@ -562,15 +567,16 @@ async function main() {
 
         const mMaze = mat4();
         let mvpMaze = mult(projection, mult(V, mMaze));
+        const uniforms = new Float32Array([...flatten(eye)]);
 
         device.queue.writeBuffer(groundUniformBuffer, 0, flatten(mvpGround));
-        device.queue.writeBuffer(groundUniformBuffer, sizeof['mat4'] * 2, new Float32Array([0.0, 0.0, 0.0])); // eye
+        device.queue.writeBuffer(groundUniformBuffer, sizeof['mat4'], flatten(mat4()));
+        device.queue.writeBuffer(groundUniformBuffer, sizeof['mat4'] * 2, uniforms);
 
-        const mazeUniforms = new Float32Array([...flatten(eye)]);
 
         device.queue.writeBuffer(mazeUniformBuffer, 0, flatten(mvpMaze));
         device.queue.writeBuffer(mazeUniformBuffer, sizeof['mat4'], flatten(mMaze));
-        device.queue.writeBuffer(mazeUniformBuffer, sizeof['mat4'] * 2, mazeUniforms);
+        device.queue.writeBuffer(mazeUniformBuffer, sizeof['mat4'] * 2, uniforms);
     }
 
     function animate(_timestamp) {
@@ -601,6 +607,7 @@ async function main() {
         pass.setIndexBuffer(groundIndicesBuffer, 'uint32');
         pass.setVertexBuffer(0, groundPositionBuffer);
         pass.setVertexBuffer(1, groundTexcoordBuffer);
+        pass.setVertexBuffer(2, groundNormalBuffer);
 
         // Draw ground
         pass.setBindGroup(0, groundBindGroup);
@@ -611,6 +618,7 @@ async function main() {
         pass.setIndexBuffer(mazeIndicesBuffer, 'uint32');
         pass.setVertexBuffer(0, mazePositionBuffer);
         pass.setVertexBuffer(1, mazeTexcoordBuffer);
+        pass.setVertexBuffer(2, mazeNormalBuffer);
         pass.setBindGroup(0, mazeBindGroup);
         pass.drawIndexed(mazeGeometry.indices.length);
 
