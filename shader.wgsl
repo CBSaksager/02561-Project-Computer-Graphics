@@ -37,7 +37,7 @@ fn main_fs_ground(@location(0) texCoords: vec2f) -> @location(0) vec4f {
     return textureSample(ourTexture, ourSampler, texCoords) * vec4f(uniforms.visibility, uniforms.visibility, uniforms.visibility, 1.0);
 }
 
-// MODEL 
+// MODEL
 struct VSOut {
     @builtin(position) position: vec4f,
     @location(0) inPos: vec4f,
@@ -66,8 +66,8 @@ fn main_fs_teapot(@location(0) inPos: vec4f, @location(1) color: vec4f, @locatio
     let k_s = vec3f(1, 1, 1) * uniforms.k_s;
 
     // Light direction
-    let l_e = -normalize(uniforms.light_pos - (uniforms.model * inPos).xyz);
-    let omega_i = -l_e;
+    let l_e = - normalize(uniforms.light_pos - (uniforms.model * inPos).xyz);
+    let omega_i = - l_e;
     let L_e = vec3f(1, 1, 1) * uniforms.L_e;
     let L_i = L_e;
     let L_a = vec3f(1, 1, 1) * uniforms.L_a;
