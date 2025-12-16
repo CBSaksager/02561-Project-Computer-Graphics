@@ -45,7 +45,7 @@ async function main() {
     }
 
     // Keyboard controls
-    const keys = {
+    const keyboard = {
         ArrowUp: false,
         ArrowDown: false
     }
@@ -57,10 +57,10 @@ async function main() {
 
         switch (event.key) {
             case 'ArrowUp':
-                keys.ArrowUp = true;
+                keyboard.ArrowUp = true;
                 break;
             case 'ArrowDown':
-                keys.ArrowDown = true;
+                keyboard.ArrowDown = true;
                 break;
             case 'ArrowLeft':
                 orientation.side += step;
@@ -75,10 +75,10 @@ async function main() {
     function handleKeyUp(event) {
         switch (event.key) {
             case 'ArrowUp':
-                keys.ArrowUp = false;
+                keyboard.ArrowUp = false;
                 break;
             case 'ArrowDown':
-                keys.ArrowDown = false;
+                keyboard.ArrowDown = false;
                 break;
         }
         updateForwardMovement();
@@ -87,9 +87,9 @@ async function main() {
     function updateForwardMovement() {
         const keyboardSpeed = 25;
 
-        if (keys.ArrowUp && !keys.ArrowDown) {
+        if (keyboard.ArrowUp && !keyboard.ArrowDown) {
             orientation.front = -keyboardSpeed;
-        } else if (!keys.ArrowUp && keys.ArrowDown) {
+        } else if (!keyboard.ArrowUp && keyboard.ArrowDown) {
             orientation.front = keyboardSpeed;
         } else {
             orientation.front = 0;
@@ -236,6 +236,20 @@ async function main() {
 
     // Generate maze geometry
     const mazeGeometry = generateMazeGeometry(maze, cellSize, 2.0);
+
+    // Create exit keys
+    const keys = [
+        { position: vec3(19.5, 0.5, 19.5), collected: false },
+        { position: vec3(19.5, 0.5, 1.5), collected: false },
+    ];
+
+    // Create exit wall
+    const exit = {
+        position: vec3(1.5, 0.5, 19.5),
+        open: false,
+        gridX: 1,
+        gridZ: 19,
+    }
 
     // MAZE
     const mazePositionBuffer = device.createBuffer({
