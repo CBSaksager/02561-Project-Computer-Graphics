@@ -699,7 +699,6 @@ async function main() {
 
         // Check for key collection
         const pickupRadius = 0.5;
-        let keysChanged = false;
         keys.forEach(key => {
             if (!key.collected) {
                 const dist = Math.sqrt(
@@ -707,7 +706,6 @@ async function main() {
                     (eye[2] - key.position[2]) ** 2);
                 if (dist < pickupRadius) {
                     key.collected = true;
-                    keysChanged = true;
                     console.log("Key collected!"); // REMOVE
 
                     if (keys.every(k => k.collected)) {
@@ -717,14 +715,6 @@ async function main() {
                 }
             }
         });
-
-        // If keys changed, regenerate maze geometry to remove collected keys
-        if (keysChanged) {
-            const newMazeGeometry = generateMazeGeometry(maze, cellSize, 2.0, true);
-            device.queue.writeBuffer(mazePositionBuffer, 0, flatten(newMazeGeometry.vertices));
-            device.queue.writeBuffer(mazeIndicesBuffer, 0, new Uint32Array(newMazeGeometry.indices));
-            device.queue.writeBuffer(mazeTexcoordBuffer, 0, flatten(newMazeGeometry.texcoords));
-        }
     }
 
     function animate(_timestamp) {
