@@ -54,11 +54,6 @@ async function main() {
         return forward;
     }
 
-    function speedToPosition(speed) {
-        const maxSpeed = 0.05; // units per frame
-        return speed * maxSpeed;
-    }
-
     // Device orientation
     window.addEventListener('deviceorientation', handleOrientation);
     function handleOrientation(event) {
@@ -435,11 +430,6 @@ async function main() {
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    const uniformBufferShadow = device.createBuffer({
-        size: sizeof['mat4'] * 2 + sizeof['vec4'] * 4,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
-
     const Mst = mat4(
         1.0, 0.0, 0.0, 0.0,
         0.0, 1.0, 0.0, 0.0,
@@ -448,7 +438,7 @@ async function main() {
     )
 
     const fov = 90;
-    let projection = perspective(fov, canvas.width / canvas.height, 0.1, 50.0);
+    let projection = perspective(fov, canvas.width / canvas.height, 0.001, 50.0);
     projection = mult(Mst, projection);
 
     const wgslfile = document.getElementById('wgsl').src;
@@ -510,32 +500,6 @@ async function main() {
         },
     });
 
-    // Create another pipeline for shadow pass to change depth test
-    const pipelineShadows = device.createRenderPipeline({
-        layout: 'auto',
-        vertex: {
-            module: wgsl,
-            entryPoint: 'main_vs_ground',
-            buffers: [positionBufferLayout, groundTexcoordBufferLayout],
-        },
-        fragment: {
-            module: wgsl,
-            entryPoint: 'main_fs_ground',
-            targets: [{ format: canvasFormat }],
-        },
-        primitive: {
-            topology: 'triangle-list',
-            frontFace: 'ccw',
-            cullMode: 'none', // No culling to see shadows on ground on both sides
-        },
-        multisample: { count: msaaCount },
-        depthStencil: {
-            depthWriteEnabled: true,
-            depthCompare: 'greater',
-            format: 'depth24plus',
-        },
-    });
-
     const msaaTexture = device.createTexture({
         size: { width: canvas.width, height: canvas.height },
         format: canvasFormat,
@@ -569,37 +533,7 @@ async function main() {
         ],
     });
 
-    const bindGroupShadows = device.createBindGroup({
-        layout: pipelineShadows.getBindGroupLayout(0),
-        entries: [
-            { binding: 0, resource: { buffer: uniformBufferShadow } },
-            { binding: 1, resource: groundTexture.sampler },
-            { binding: 2, resource: groundTexture.createView() },
-        ],
-    });
-
-    let lightAngle = 45;
-    const lightRadius = 2.0;
-    // let lightPos = vec3(lightRadius * Math.sin(lightAngle), 2, -2 + lightRadius * Math.cos(lightAngle));
     let lightPos = vec3(10.5, 15, 10.5);
-
-    function computeShadowMatrix(V, M) {
-        const epsilon = 0.0001;
-        const l = lightPos;
-        const n = vec3(0, 1, 0);
-        const d = 1.0 + epsilon;
-
-        const a = d + dot(n, l);
-        const Mshadow = mat4(
-            a - l[0] * n[0], -l[0] * n[1], -l[0] * n[2], -l[0] * d,
-            -l[1] * n[0], a - l[1] * n[1], -l[1] * n[2], -l[1] * d,
-            -l[2] * n[0], -l[2] * n[1], a - l[2] * n[2], -l[2] * d,
-            -n[0], -n[1], -n[2], a - d
-        );
-
-        const mvpShadow = mult(projection, mult(V, mult(Mshadow, M)));
-        return mvpShadow;
-    }
 
     let eye = vec3(1.5, 1, 1.5); // Start in cell (1,1)
     // let eye = vec3(10.5, 20, 10.5); // View maze from above
@@ -613,7 +547,8 @@ async function main() {
         const angleRadians = -orientation.side * Math.PI / 180;
         const forwardX = Math.sin(angleRadians);
         const forwardZ = -Math.cos(angleRadians);
-        const speed = speedToPosition(forwardMovement);
+        const maxSpeed = 0.05; // units per frame
+        const speed = forwardMovement * maxSpeed;
 
         const newEye = vec3(
             eye[0] + forwardX * speed,
@@ -638,8 +573,6 @@ async function main() {
         const mMaze = mat4();
         let mvpMaze = mult(projection, mult(V, mMaze));
 
-        const mvpShadow = computeShadowMatrix(V, mMaze);
-
         const options = getOptions();
 
         device.queue.writeBuffer(groundUniformBuffer, 0, flatten(mvpGround));
@@ -654,22 +587,15 @@ async function main() {
         device.queue.writeBuffer(mazeUniformBuffer, 0, flatten(mvpMaze));
         device.queue.writeBuffer(mazeUniformBuffer, sizeof['mat4'], flatten(mMaze));
         device.queue.writeBuffer(mazeUniformBuffer, sizeof['mat4'] * 2, mazeUniforms);
-
-        device.queue.writeBuffer(uniformBufferShadow, 0, flatten(mvpShadow));
-        device.queue.writeBuffer(uniformBufferShadow, sizeof['mat4'] * 2, new Float32Array([0.0, 0.0, 0.0, 0.0]));
     }
 
-    function animate(timestamp) {
-        // lastTime = timestamp;
+    function animate(_timestamp) {
         updateUniforms();
-        // console.log("render");
         render();
         requestAnimationFrame(animate);
     }
 
     function render() {
-        // console.log("Render frame");
-
         const encoder = device.createCommandEncoder();
         const pass = encoder.beginRenderPass({
             colorAttachments: [{
@@ -696,15 +622,9 @@ async function main() {
         pass.setBindGroup(0, groundBindGroup);
         pass.drawIndexed(6);
 
-        // Draw shadows
-        pass.setPipeline(pipelineShadows);
-        pass.setIndexBuffer(mazeIndicesBuffer, 'uint32');
-        pass.setVertexBuffer(0, mazePositionBuffer);
-        pass.setBindGroup(0, bindGroupShadows);
-        pass.drawIndexed(mazeGeometry.indices.length);
-
         // Draw maze
         pass.setPipeline(mazePipeline);
+        pass.setIndexBuffer(mazeIndicesBuffer, 'uint32');
         pass.setVertexBuffer(0, mazePositionBuffer);
         pass.setVertexBuffer(1, mazeTexcoordBuffer);
         pass.setBindGroup(0, mazeBindGroup);
