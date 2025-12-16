@@ -2,13 +2,6 @@ struct Uniforms {
     mvp: mat4x4f,
     model: mat4x4f,
     eye: vec3f,
-    visibility: f32,
-    light_pos: vec3f,
-    L_e: f32,
-    L_a: f32,
-    k_d: f32,
-    k_s: f32,
-    s: f32,
 }
 
 @group(0) @binding(0)
@@ -25,7 +18,7 @@ struct VSOutGround {
 }
 
 @vertex
-fn main_vs_ground(@location(0) inPos: vec4f, @location(3) texCoord: vec2f, @builtin(instance_index) instance: u32) -> VSOutGround {
+fn main_vs_texture(@location(0) inPos: vec4f, @location(3) texCoord: vec2f, @builtin(instance_index) instance: u32) -> VSOutGround {
     var vsOut: VSOutGround;
     vsOut.position = uniforms.mvp * inPos;
     vsOut.texCoord = texCoord;
@@ -33,8 +26,8 @@ fn main_vs_ground(@location(0) inPos: vec4f, @location(3) texCoord: vec2f, @buil
 }
 
 @fragment
-fn main_fs_ground(@location(0) texCoords: vec2f) -> @location(0) vec4f {
-    return textureSample(ourTexture, ourSampler, texCoords) * vec4f(uniforms.visibility, uniforms.visibility, uniforms.visibility, 1.0);
+fn main_fs_texture(@location(0) texCoords: vec2f) -> @location(0) vec4f {
+    return textureSample(ourTexture, ourSampler, texCoords);
 }
 
 // MODEL

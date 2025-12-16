@@ -1,29 +1,5 @@
 "use strict";
 
-function setupInputListeners(onchange) {
-    document.getElementById('emitted-radiance').oninput = onchange;
-    document.getElementById('ambient-radiance').oninput = onchange;
-    document.getElementById('diffuse').oninput = onchange;
-    document.getElementById('specular').oninput = onchange;
-    document.getElementById('shininess').oninput = onchange;
-}
-
-function getOptions() {
-    const emittedRadianceSlider = document.getElementById('emitted-radiance');
-    const ambientRadianceSlider = document.getElementById('ambient-radiance');
-    const diffuseSlider = document.getElementById('diffuse');
-    const specularSlider = document.getElementById('specular');
-    const shininessSlider = document.getElementById('shininess');
-
-    return {
-        emittedRadianceSlider: parseFloat(emittedRadianceSlider.value),
-        ambientRadianceSlider: parseFloat(ambientRadianceSlider.value),
-        diffuseSlider: parseFloat(diffuseSlider.value),
-        specularSlider: parseFloat(specularSlider.value),
-        shininessSlider: parseFloat(shininessSlider.value),
-    };
-}
-
 async function main() {
     const gpu = navigator.gpu;
     const adapter = await gpu.requestAdapter();
@@ -77,7 +53,7 @@ async function main() {
     window.addEventListener('keyup', handleKeyUp);
 
     function handleKeyDown(event) {
-        const step = 2.5; // degrees per key press
+        const step = 5; // degrees per key press
 
         switch (event.key) {
             case 'ArrowUp':
@@ -454,12 +430,12 @@ async function main() {
         layout: 'auto',
         vertex: {
             module: wgsl,
-            entryPoint: 'main_vs_ground',
+            entryPoint: 'main_vs_texture',
             buffers: [groundPositionBufferLayout, groundTexcoordBufferLayout],
         },
         fragment: {
             module: wgsl,
-            entryPoint: 'main_fs_ground',
+            entryPoint: 'main_fs_texture',
             targets: [{ format: canvasFormat }],
         },
         primitive: {
@@ -479,12 +455,12 @@ async function main() {
         layout: 'auto',
         vertex: {
             module: wgsl,
-            entryPoint: 'main_vs_ground',
+            entryPoint: 'main_vs_texture',
             buffers: [positionBufferLayout, mazeTexcoordBufferLayout],
         },
         fragment: {
             module: wgsl,
-            entryPoint: 'main_fs_ground',
+            entryPoint: 'main_fs_texture',
             targets: [{ format: canvasFormat }],
         },
         primitive: {
@@ -573,16 +549,10 @@ async function main() {
         const mMaze = mat4();
         let mvpMaze = mult(projection, mult(V, mMaze));
 
-        const options = getOptions();
-
         device.queue.writeBuffer(groundUniformBuffer, 0, flatten(mvpGround));
-        device.queue.writeBuffer(groundUniformBuffer, sizeof['mat4'] * 2, new Float32Array([0.0, 0.0, 0.0, 1.0])); // eye, visibility
+        device.queue.writeBuffer(groundUniformBuffer, sizeof['mat4'] * 2, new Float32Array([0.0, 0.0, 0.0])); // eye
 
-        const mazeUniforms = new Float32Array([
-            ...flatten(eye), 1.0,
-            ...flatten(lightPos), options.emittedRadianceSlider,
-            options.ambientRadianceSlider, options.diffuseSlider, options.specularSlider, options.shininessSlider,
-        ]);
+        const mazeUniforms = new Float32Array([...flatten(eye)]);
 
         device.queue.writeBuffer(mazeUniformBuffer, 0, flatten(mvpMaze));
         device.queue.writeBuffer(mazeUniformBuffer, sizeof['mat4'], flatten(mMaze));
