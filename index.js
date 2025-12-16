@@ -124,31 +124,50 @@ async function main() {
         return maze;
     }
 
-    function addWallBox(vertices, indices, normals, colors, x, y, z, w, h, d) {
+    function addWallBox(vertices, indices, normals, colors, texcoords, x, y, z, w, h, d) {
         const baseIndex = vertices.length;
 
-        // 8 vertices of the box
-        const v = [
-            vec4(x, y, z, 1), vec4(x + w, y, z, 1), vec4(x + w, y + h, z, 1), vec4(x, y + h, z, 1),
-            vec4(x, y, z + d, 1), vec4(x + w, y, z + d, 1), vec4(x + w, y + h, z + d, 1), vec4(x, y + h, z + d, 1)
+        // Front face (z = z)
+        vertices.push(vec4(x, y, z, 1), vec4(x + w, y, z, 1), vec4(x + w, y + h, z, 1), vec4(x, y + h, z, 1));
+        texcoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+
+        // Back face (z = z + d)
+        vertices.push(vec4(x + w, y, z + d, 1), vec4(x, y, z + d, 1), vec4(x, y + h, z + d, 1), vec4(x + w, y + h, z + d, 1));
+        texcoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+
+        // Right face (x = x + w)
+        vertices.push(vec4(x + w, y, z, 1), vec4(x + w, y, z + d, 1), vec4(x + w, y + h, z + d, 1), vec4(x + w, y + h, z, 1));
+        texcoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+
+        // Left face (x = x)
+        vertices.push(vec4(x, y, z + d, 1), vec4(x, y, z, 1), vec4(x, y + h, z, 1), vec4(x, y + h, z + d, 1));
+        texcoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+
+        // Top face (y = y + h)
+        vertices.push(vec4(x, y + h, z, 1), vec4(x + w, y + h, z, 1), vec4(x + w, y + h, z + d, 1), vec4(x, y + h, z + d, 1));
+        texcoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+
+        // Bottom face (y = y)
+        vertices.push(vec4(x, y, z + d, 1), vec4(x + w, y, z + d, 1), vec4(x + w, y, z, 1), vec4(x, y, z, 1));
+        texcoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+
+        // Indices for 6 faces (2 triangles per face)
+        const faceIndices = [
+            0, 1, 2, 0, 2, 3,       // Front
+            4, 5, 6, 4, 6, 7,       // Back
+            8, 9, 10, 8, 10, 11,    // Right
+            12, 13, 14, 12, 14, 15, // Left
+            16, 17, 18, 16, 18, 19, // Top
+            20, 21, 22, 20, 22, 23  // Bottom
         ];
 
-        vertices.push(...v);
-
-        // 12 triangles (6 faces * 2 triangles)
-        const faces = [
-            [0, 1, 2], [0, 2, 3], [5, 4, 7], [5, 7, 6], [1, 5, 6], [1, 6, 2],
-            [4, 0, 3], [4, 3, 7], [3, 2, 6], [3, 6, 7], [4, 5, 1], [4, 1, 0]
-        ];
-
-        for (const face of faces) {
-            indices.push(...face.map(i => baseIndex + i));
+        for (const idx of faceIndices) {
+            indices.push(baseIndex + idx);
         }
 
-        // Add colors and normals for all vertices
-        const color = vec4(0.7, 0.7, 0.7, 1.0);
-        for (let i = 0; i < 8; i++) {
-            colors.push(color);
+        // Add colors and normals for all 24 vertices
+        for (let i = 0; i < 24; i++) {
+            colors.push(vec4(1.0, 1.0, 1.0, 1.0));
             normals.push(vec4(0, 1, 0, 0));
         }
     }
@@ -158,18 +177,19 @@ async function main() {
         const indices = [];
         const normals = [];
         const colors = [];
+        const texcoords = [];
 
         for (let y = 0; y < maze.length; y++) {
             for (let x = 0; x < maze[y].length; x++) {
                 if (maze[y][x] === 1) { // Wall
-                    addWallBox(vertices, indices, normals, colors,
+                    addWallBox(vertices, indices, normals, colors, texcoords,
                         x * cellSize, 0, y * cellSize,
                         cellSize, wallHeight, cellSize);
                 }
             }
         }
 
-        return { vertices, indices, normals, colors };
+        return { vertices, indices, normals, colors, texcoords };
     }
 
     // Grid-based collision detection
@@ -257,6 +277,21 @@ async function main() {
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
+    const mazeTexcoordBuffer = device.createBuffer({
+        size: sizeof['vec2'] * mazeGeometry.texcoords.length,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(mazeTexcoordBuffer, 0, flatten(mazeGeometry.texcoords));
+
+    const mazeTexcoordBufferLayout = {
+        arrayStride: sizeof['vec2'],
+        attributes: [{
+            format: 'float32x2',
+            offset: 0,
+            shaderLocation: 3,
+        }],
+    };
+
     // GROUND
     let positionsGround = [
         vec3(0, -0.01, 0),
@@ -335,6 +370,29 @@ async function main() {
         magFilter: 'linear',
     });
 
+    const wallFilename = 'brick_wall_07_diff_4k.png';
+    const wallResponse = await fetch(wallFilename);
+    const wallBlob = await wallResponse.blob();
+    const wallImg = await createImageBitmap(wallBlob, { colorSpaceConversion: 'none' });
+
+    const wallTexture = device.createTexture({
+        size: [wallImg.width, wallImg.height, 1],
+        format: "rgba8unorm",
+        usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT
+    });
+    device.queue.copyExternalImageToTexture(
+        { source: wallImg, flipY: true },
+        { texture: wallTexture },
+        { width: wallImg.width, height: wallImg.height },
+    );
+
+    wallTexture.sampler = device.createSampler({
+        addressModeU: 'repeat',
+        addressModeV: 'repeat',
+        minFilter: 'linear',
+        magFilter: 'linear',
+    });
+
     const bgcolor = vec4(0.3921, 0.5843, 0.9294, 1.0) // Cornflower
 
     const groundUniformBuffer = device.createBuffer({
@@ -396,12 +454,12 @@ async function main() {
         layout: 'auto',
         vertex: {
             module: wgsl,
-            entryPoint: 'main_vs_teapot',
-            buffers: [positionBufferLayout, mazeColorBufferLayout, mazeNormalBufferLayout],
+            entryPoint: 'main_vs_ground',
+            buffers: [positionBufferLayout, mazeTexcoordBufferLayout],
         },
         fragment: {
             module: wgsl,
-            entryPoint: 'main_fs_teapot',
+            entryPoint: 'main_fs_ground',
             targets: [{ format: canvasFormat }],
         },
         primitive: {
@@ -471,6 +529,8 @@ async function main() {
         layout: mazePipeline.getBindGroupLayout(0),
         entries: [
             { binding: 0, resource: { buffer: mazeUniformBuffer } },
+            { binding: 1, resource: wallTexture.sampler },
+            { binding: 2, resource: wallTexture.createView() },
         ],
     });
 
@@ -506,8 +566,8 @@ async function main() {
         return mvpShadow;
     }
 
-    // let eye = vec3(1.5, 1, 1.5); // Start in cell (1,1)
-    let eye = vec3(10.5, 20, 10.5); // View maze from above
+    let eye = vec3(1.5, 1, 1.5); // Start in cell (1,1)
+    // let eye = vec3(10.5, 20, 10.5); // View maze from above
     const collisionRadius = 0.1;
 
     function updateUniforms() {
@@ -533,8 +593,8 @@ async function main() {
 
         // Update view matrix based on orientation
         const rotationMatrix = rotateY(-orientation.side);
-        // const lookAtPoint = mult(rotationMatrix, vec4(0, 0, -1, 0));
-        const lookAtPoint = vec4(0, -50, 10, 0); // Look down on maze
+        const lookAtPoint = mult(rotationMatrix, vec4(0, 0, -1, 0));
+        // const lookAtPoint = vec4(0, -50, 10, 0); // Look down on maze
 
         const V = lookAt(eye, vec3(eye[0] + lookAtPoint[0], eye[1] + lookAtPoint[1], eye[2] + lookAtPoint[2]), up);
 
@@ -610,8 +670,8 @@ async function main() {
 
         // Draw maze
         pass.setPipeline(mazePipeline);
-        pass.setVertexBuffer(1, mazeColorBuffer);
-        pass.setVertexBuffer(2, mazeNormalBuffer);
+        pass.setVertexBuffer(0, mazePositionBuffer);
+        pass.setVertexBuffer(1, mazeTexcoordBuffer);
         pass.setBindGroup(0, mazeBindGroup);
         pass.drawIndexed(mazeGeometry.indices.length);
 
