@@ -112,9 +112,9 @@ async function main() {
         const keyboardSpeed = 25;
 
         if (keys.ArrowUp && !keys.ArrowDown) {
-            orientation.front = keyboardSpeed;
-        } else if (!keys.ArrowUp && keys.ArrowDown) {
             orientation.front = -keyboardSpeed;
+        } else if (!keys.ArrowUp && keys.ArrowDown) {
+            orientation.front = keyboardSpeed;
         } else {
             orientation.front = 0;
         }
