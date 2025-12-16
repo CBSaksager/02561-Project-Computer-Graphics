@@ -68,18 +68,22 @@ async function main() {
     }
 
     // Keyboard controls
+    const keys = {
+        ArrowUp: false,
+        ArrowDown: false
+    }
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
     function handleKeyDown(event) {
         const step = 2.5; // degrees per key press
 
         switch (event.key) {
             case 'ArrowUp':
-                orientation.front += step;
-                console.log(orientation.front); // TODO: Remove
+                keys.ArrowUp = true;
                 break;
             case 'ArrowDown':
-                orientation.front -= step;
-                console.log(orientation.front); // TODO: Remove
+                keys.ArrowDown = true;
                 break;
             case 'ArrowLeft':
                 orientation.side += step;
@@ -87,6 +91,31 @@ async function main() {
             case 'ArrowRight':
                 orientation.side -= step;
                 break;
+        }
+        updateForwardMovement();
+    }
+
+    function handleKeyUp(event) {
+        switch (event.key) {
+            case 'ArrowUp':
+                keys.ArrowUp = false;
+                break;
+            case 'ArrowDown':
+                keys.ArrowDown = false;
+                break;
+        }
+        updateForwardMovement();
+    }
+
+    function updateForwardMovement() {
+        const keyboardSpeed = 25;
+
+        if (keys.ArrowUp && !keys.ArrowDown) {
+            orientation.front = keyboardSpeed;
+        } else if (!keys.ArrowUp && keys.ArrowDown) {
+            orientation.front = -keyboardSpeed;
+        } else {
+            orientation.front = 0;
         }
     }
 
