@@ -135,29 +135,30 @@ async function main() {
     function addWallBox(vertices, indices, normals, colors, texcoords, x, y, z, w, h, d) {
         const baseIndex = vertices.length;
 
+        const texcoordX = 2;
+        const texCoordY = 4.5;
+
         // Front face (z = z)
         vertices.push(vec4(x, y, z, 1), vec4(x + w, y, z, 1), vec4(x + w, y + h, z, 1), vec4(x, y + h, z, 1));
-        texcoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+        texcoords.push(vec2(0, 0), vec2(texcoordX, 0), vec2(texcoordX, texCoordY), vec2(0, texCoordY));
 
         // Back face (z = z + d)
         vertices.push(vec4(x + w, y, z + d, 1), vec4(x, y, z + d, 1), vec4(x, y + h, z + d, 1), vec4(x + w, y + h, z + d, 1));
-        texcoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+        texcoords.push(vec2(0, 0), vec2(texcoordX, 0), vec2(texcoordX, texCoordY), vec2(0, texCoordY));
 
         // Right face (x = x + w)
         vertices.push(vec4(x + w, y, z, 1), vec4(x + w, y, z + d, 1), vec4(x + w, y + h, z + d, 1), vec4(x + w, y + h, z, 1));
-        texcoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
-
+        texcoords.push(vec2(0, 0), vec2(texcoordX, 0), vec2(texcoordX, texCoordY), vec2(0, texCoordY));
         // Left face (x = x)
         vertices.push(vec4(x, y, z + d, 1), vec4(x, y, z, 1), vec4(x, y + h, z, 1), vec4(x, y + h, z + d, 1));
-        texcoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+        texcoords.push(vec2(0, 0), vec2(texcoordX, 0), vec2(texcoordX, texCoordY), vec2(0, texCoordY));
 
         // Top face (y = y + h)
         vertices.push(vec4(x, y + h, z, 1), vec4(x + w, y + h, z, 1), vec4(x + w, y + h, z + d, 1), vec4(x, y + h, z + d, 1));
-        texcoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
-
+        texcoords.push(vec2(0, 0), vec2(texcoordX, 0), vec2(texcoordX, texCoordY), vec2(0, texCoordY));
         // Bottom face (y = y)
         vertices.push(vec4(x, y, z + d, 1), vec4(x + w, y, z + d, 1), vec4(x + w, y, z, 1), vec4(x, y, z, 1));
-        texcoords.push(vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1));
+        texcoords.push(vec2(0, 0), vec2(texcoordX, 0), vec2(texcoordX, texCoordY), vec2(0, texCoordY));
 
         // Indices for 6 faces (2 triangles per face)
         const faceIndices = [
@@ -243,7 +244,7 @@ async function main() {
     }
 
     // Generate maze geometry
-    const mazeGeometry = generateMazeGeometry(maze, cellSize, 2.0);
+    const mazeGeometry = generateMazeGeometry(maze, cellSize, 8.0);
 
     // Create exit keys
     const keys = [
