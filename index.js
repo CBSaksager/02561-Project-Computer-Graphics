@@ -246,20 +246,6 @@ async function main() {
     // Generate maze geometry
     const mazeGeometry = generateMazeGeometry(maze, cellSize, 8.0);
 
-    // Create exit keys
-    const keys = [
-        { position: vec3(19.5, 0.5, 19.5), collected: false },
-        { position: vec3(19.5, 0.5, 1.5), collected: false },
-    ];
-
-    // Create exit wall
-    const exit = {
-        position: vec3(1.5, 0.5, 19.5),
-        open: false,
-        gridX: 1,
-        gridZ: 19,
-    }
-
     // MAZE
     const mazePositionBuffer = device.createBuffer({
         size: sizeof['vec4'] * mazeGeometry.vertices.length,
@@ -267,10 +253,6 @@ async function main() {
     });
     device.queue.writeBuffer(mazePositionBuffer, 0, flatten(mazeGeometry.vertices));
 
-    const mazeNormalBuffer = device.createBuffer({
-        size: sizeof['vec4'] * mazeGeometry.normals.length,
-        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    });
     const normalBufferLayout = {
         arrayStride: sizeof['vec4'],
         attributes: [{
@@ -279,7 +261,6 @@ async function main() {
             shaderLocation: 2,
         }],
     };
-    device.queue.writeBuffer(mazeNormalBuffer, 0, flatten(mazeGeometry.normals));
 
     const mazeIndicesBuffer = device.createBuffer({
         size: Uint32Array.BYTES_PER_ELEMENT * mazeGeometry.indices.length,
@@ -306,6 +287,105 @@ async function main() {
             shaderLocation: 1,
         }],
     };
+
+    // KEYS
+    // Create exit keys
+    const keys = [
+        { position: vec3(1.5, 1, 19.5), collected: false },
+        { position: vec3(19.5, 1, 1.5), collected: false },
+    ];
+
+    // Create exit wall
+    // const exit = {
+    //     position: vec3(1.5, 0.5, 19.5),
+    //     open: false,
+    //     gridX: 1,
+    //     gridZ: 19,
+    // };
+
+    function generateKeyGeometry() {
+        const size = 0.3;
+        const vertices = [];
+        const indices = [];
+        const colors = [];
+
+        const positions = [
+            // Front
+            vec4(-size, -size, size, 1), vec4(size, -size, size, 1), vec4(size, size, size, 1), vec4(-size, size, size, 1),
+            // Back
+            vec4(size, -size, -size, 1), vec4(-size, -size, -size, 1), vec4(-size, size, -size, 1), vec4(size, size, -size, 1),
+            // Right
+            vec4(size, -size, size, 1), vec4(size, -size, -size, 1), vec4(size, size, -size, 1), vec4(size, size, size, 1),
+            // Left
+            vec4(-size, -size, -size, 1), vec4(-size, -size, size, 1), vec4(-size, size, size, 1), vec4(-size, size, -size, 1),
+            // Top
+            vec4(-size, size, size, 1), vec4(size, size, size, 1), vec4(size, size, -size, 1), vec4(-size, size, -size, 1),
+            // Bottom
+            vec4(-size, -size, -size, 1), vec4(size, -size, -size, 1), vec4(size, -size, size, 1), vec4(-size, -size, size, 1)
+        ];
+
+        const faceIndices = [
+            0, 1, 2, 0, 2, 3,
+            4, 5, 6, 4, 6, 7,
+            8, 9, 10, 8, 10, 11,
+            12, 13, 14, 12, 14, 15,
+            16, 17, 18, 16, 18, 19,
+            20, 21, 22, 20, 22, 23
+        ];
+
+        positions.forEach(p => vertices.push(p));
+        faceIndices.forEach(i => indices.push(i));
+
+        // Yellow/gold color for keys
+        for (let i = 0; i < 24; i++) {
+            colors.push(vec4(1.0, 0.84, 0.0, 1.0));
+        }
+
+        return { vertices, indices, colors };
+    }
+    const keyGeometry = generateKeyGeometry();
+
+    const keyNormals = [];
+    for (let i = 0; i < 24; i++) {
+        if (i < 4) { keyNormals.push(vec4(0, 0, -1, 0)); }
+        else if (i < 8) keyNormals.push(vec4(0, 0, 1, 0));
+        else if (i < 12) keyNormals.push(vec4(1, 0, 0, 0));
+        else if (i < 16) keyNormals.push(vec4(-1, 0, 0, 0));
+        else if (i < 20) keyNormals.push(vec4(0, 1, 0, 0));
+        else keyNormals.push(vec4(0, -1, 0, 0));
+    }
+
+    const keyPositionBuffer = device.createBuffer({
+        size: sizeof['vec4'] * keyGeometry.vertices.length,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(keyPositionBuffer, 0, flatten(keyGeometry.vertices));
+
+    const keyNormalBuffer = device.createBuffer({
+        size: sizeof['vec4'] * keyNormals.length,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(keyNormalBuffer, 0, flatten(keyNormals));
+
+    const keyColorBuffer = device.createBuffer({
+        size: sizeof['vec4'] * keyGeometry.colors.length,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(keyColorBuffer, 0, flatten(keyGeometry.colors));
+    const keyColorBufferLayout = {
+        arrayStride: sizeof['vec4'],
+        attributes: [{
+            format: 'float32x4',
+            offset: 0,
+            shaderLocation: 1,
+        }],
+    };
+
+    const keyIndicesBuffer = device.createBuffer({
+        size: Uint32Array.BYTES_PER_ELEMENT * keyGeometry.indices.length,
+        usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(keyIndicesBuffer, 0, new Uint32Array(keyGeometry.indices));
 
     // GROUND
     let positionsGround = [
@@ -496,6 +576,32 @@ async function main() {
         },
     });
 
+    // Create a simple colored pipeline for keys
+    const keyPipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: {
+            module: wgsl,
+            entryPoint: 'main_vs_color',
+            buffers: [positionBufferLayout, keyColorBufferLayout, normalBufferLayout],
+        },
+        fragment: {
+            module: wgsl,
+            entryPoint: 'main_fs_color',
+            targets: [{ format: canvasFormat }],
+        },
+        primitive: {
+            topology: 'triangle-list',
+            frontFace: 'ccw',
+            cullMode: 'back',
+        },
+        multisample: { count: msaaCount },
+        depthStencil: {
+            depthWriteEnabled: true,
+            depthCompare: 'less',
+            format: 'depth24plus',
+        },
+    });
+
     const msaaTexture = device.createTexture({
         size: { width: canvas.width, height: canvas.height },
         format: canvasFormat,
@@ -529,10 +635,22 @@ async function main() {
         ],
     });
 
+    const keyUniformBuffer = keys.map(() => device.createBuffer({
+        size: sizeof['mat4'] * 2 + sizeof['vec4'] * 4,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    }));
+
+    const keyBindGroup = keyUniformBuffer.map(buffer => device.createBindGroup({
+        layout: keyPipeline.getBindGroupLayout(0),
+        entries: [
+            { binding: 0, resource: { buffer: buffer } }
+        ],
+    }));
+
     let lightPos = vec3(10.5, 15, 10.5);
 
     let eye = vec3(1.5, 1, 1.5); // Start in cell (1,1)
-    // let eye = vec3(10.5, 20, 10.5); // View maze from above
+    // let eye = vec3(10.5, 35, 10.5); // View maze from above
     const collisionRadius = 0.1;
 
     function updateUniforms() {
@@ -578,6 +696,35 @@ async function main() {
         device.queue.writeBuffer(mazeUniformBuffer, 0, flatten(mvpMaze));
         device.queue.writeBuffer(mazeUniformBuffer, sizeof['mat4'], flatten(mMaze));
         device.queue.writeBuffer(mazeUniformBuffer, sizeof['mat4'] * 2, uniforms);
+
+        // Check for key collection
+        const pickupRadius = 0.5;
+        let keysChanged = false;
+        keys.forEach(key => {
+            if (!key.collected) {
+                const dist = Math.sqrt(
+                    (eye[0] - key.position[0]) ** 2 +
+                    (eye[2] - key.position[2]) ** 2);
+                if (dist < pickupRadius) {
+                    key.collected = true;
+                    keysChanged = true;
+                    console.log("Key collected!"); // REMOVE
+
+                    if (keys.every(k => k.collected)) {
+                        // exit.open = true;
+                        console.log("Exit opened!"); // REMOVE
+                    }
+                }
+            }
+        });
+
+        // If keys changed, regenerate maze geometry to remove collected keys
+        if (keysChanged) {
+            const newMazeGeometry = generateMazeGeometry(maze, cellSize, 2.0, true);
+            device.queue.writeBuffer(mazePositionBuffer, 0, flatten(newMazeGeometry.vertices));
+            device.queue.writeBuffer(mazeIndicesBuffer, 0, new Uint32Array(newMazeGeometry.indices));
+            device.queue.writeBuffer(mazeTexcoordBuffer, 0, flatten(newMazeGeometry.texcoords));
+        }
     }
 
     function animate(_timestamp) {
@@ -587,6 +734,21 @@ async function main() {
     }
 
     function render() {
+        keys.forEach((key, i) => {
+            if (!key.collected) {
+                const rotationMatrix = rotateY(-orientation.side);
+                const lookAtPoint = mult(rotationMatrix, vec4(0, 0, -1, 0));
+                const V = lookAt(eye, vec3(eye[0] + lookAtPoint[0], eye[1] + lookAtPoint[1], eye[2] + lookAtPoint[2]), vec3(0, 1, 0));
+
+                const keyModel = translate(key.position[0], key.position[1], key.position[2]);
+                const keyMvp = mult(projection, mult(V, keyModel));
+
+                device.queue.writeBuffer(keyUniformBuffer[i], 0, flatten(keyMvp));
+                device.queue.writeBuffer(keyUniformBuffer[i], sizeof['mat4'], flatten(keyModel));
+                device.queue.writeBuffer(keyUniformBuffer[i], sizeof['mat4'] * 2, new Float32Array([...flatten(eye)]));
+            }
+        })
+
         const encoder = device.createCommandEncoder();
         const pass = encoder.beginRenderPass({
             colorAttachments: [{
@@ -619,9 +781,21 @@ async function main() {
         pass.setIndexBuffer(mazeIndicesBuffer, 'uint32');
         pass.setVertexBuffer(0, mazePositionBuffer);
         pass.setVertexBuffer(1, mazeTexcoordBuffer);
-        pass.setVertexBuffer(2, mazeNormalBuffer);
         pass.setBindGroup(0, mazeBindGroup);
         pass.drawIndexed(mazeGeometry.indices.length);
+
+        // Draw keys
+        keys.forEach((key, i) => {
+            if (!key.collected) {
+                pass.setPipeline(keyPipeline);
+                pass.setIndexBuffer(keyIndicesBuffer, 'uint32');
+                pass.setVertexBuffer(0, keyPositionBuffer);
+                pass.setVertexBuffer(1, keyColorBuffer);
+                pass.setVertexBuffer(2, keyNormalBuffer);
+                pass.setBindGroup(0, keyBindGroup[i]);
+                pass.drawIndexed(keyGeometry.indices.length);
+            }
+        });
 
         pass.end();
         device.queue.submit([encoder.finish()]);
