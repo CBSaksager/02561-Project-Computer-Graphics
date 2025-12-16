@@ -44,11 +44,12 @@ async function main() {
 
     // Segway movement
     function orientationToSpeed(orientation) {
-        // Orientation deadzone
-        const deadzone = 10; // degrees
+        const deadzone = 15;
+        const maxSpeedAngle = 45;
         let forward = 0;
         if (Math.abs(orientation.front) > deadzone) {
-            forward = (orientation.front - Math.sign(orientation.front) * deadzone) / (90 - deadzone);
+            // Map orientation angle to speed -1 to 1 based on percentage between deadzone and maxSpeedAngle
+            forward = -(orientation.front - Math.sign(orientation.front) * deadzone) / (maxSpeedAngle - deadzone);
         }
         return forward;
     }
@@ -61,10 +62,15 @@ async function main() {
     // Device orientation
     window.addEventListener('deviceorientation', handleOrientation);
     function handleOrientation(event) {
-        document.getElementById('orientation-text').textContent = `alpha: ${event.alpha?.toFixed(2)}, beta: ${event.beta?.toFixed(2)}, gamma: ${event.gamma?.toFixed(2)}`;
+        const { alpha, beta, gamma } = event;
+        const { forward, right, up } = getEulerAngles(getRotationMatrix(alpha, beta, gamma));
 
-        orientation.front = event.beta;
-        orientation.side = event.alpha + 90;
+        let text = `alpha: ${event.alpha?.toFixed(2)}, beta: ${event.beta?.toFixed(2)}, gamma: ${event.gamma?.toFixed(2)}`;
+        text += ` \nforward: ${forward.toFixed(2)}, side: ${right.toFixed(2)}, up: ${up.toFixed(2)}`;
+        document.getElementById('orientation-text').textContent = text;
+
+        orientation.front = right;
+        orientation.side = up;
     }
 
     // Keyboard controls
@@ -713,3 +719,60 @@ async function main() {
 }
 
 window.onload = function () { main(); }
+
+
+// Converts DeviceOrientation angles to rotation matrix
+// Based on snippet from https://w3c.github.io/deviceorientation/#example-76d62ad0
+// Apapted based on https://stackoverflow.com/questions/69216465/the-simplest-way-to-solve-gimbal-lock-when-using-deviceorientation-events-in-jav
+function getRotationMatrix(alpha, beta, gamma) {
+    const degtorad = Math.PI / 180; // Degree-to-Radian conversion
+    var cX = Math.cos(beta * degtorad);
+    var cY = Math.cos(gamma * degtorad);
+    var cZ = Math.cos(alpha * degtorad);
+    var sX = Math.sin(beta * degtorad);
+    var sY = Math.sin(gamma * degtorad);
+    var sZ = Math.sin(alpha * degtorad);
+
+    var m11 = cZ * cY - sZ * sX * sY;
+    var m12 = - cX * sZ;
+    var m13 = cY * sZ * sX + cZ * sY;
+
+    var m21 = cY * sZ + cZ * sX * sY;
+    var m22 = cZ * cX;
+    var m23 = sZ * sY - cZ * cY * sX;
+
+    var m31 = - cX * sY;
+    var m32 = sX;
+    var m33 = cX * cY;
+
+    return [
+        m13, m11, m12,
+        m23, m21, m22,
+        m33, m31, m32
+    ];
+};
+
+// Converts rotation matrix to Euler angles
+// Based on https://learnopencv.com/rotation-matrix-to-euler-angles/
+// Apapted based on https://stackoverflow.com/questions/69216465/the-simplest-way-to-solve-gimbal-lock-when-using-deviceorientation-events-in-jav
+function getEulerAngles(matrix) {
+    var radtodeg = 180 / Math.PI; // Radian-to-Degree conversion
+    var sy = Math.sqrt(matrix[0] * matrix[0] + matrix[3] * matrix[3]);
+
+    var singular = sy < 1e-6; // If
+
+    if (!singular) {
+        var x = Math.atan2(matrix[7], matrix[8]);
+        var y = Math.atan2(-matrix[6], sy);
+        var z = Math.atan2(matrix[3], matrix[0]);
+    } else {
+        var x = Math.atan2(-matrix[5], matrix[4]);
+        var y = Math.atan2(-matrix[6], sy);
+        var z = 0;
+    }
+    return {
+        forward: radtodeg * x,
+        right: radtodeg * y,
+        up: radtodeg * z
+    };
+}
