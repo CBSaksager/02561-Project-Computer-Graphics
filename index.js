@@ -1,63 +1,102 @@
 "use strict";
 
+// Debug logging function
+function debugLog(message) {
+    console.log(message);
+    const debugDiv = document.getElementById('debug-log');
+    if (debugDiv) {
+        const time = new Date().toLocaleTimeString();
+        debugDiv.innerHTML += `[${time}] ${message}<br>`;
+        debugDiv.scrollTop = debugDiv.scrollHeight;
+    }
+}
+
 async function main() {
-    const gpu = navigator.gpu;
-    const adapter = await gpu.requestAdapter();
-    const device = await adapter.requestDevice();
-    const canvas = document.getElementById('my-canvas');
-    const context = canvas.getContext('webgpu');
-    const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
-    context.configure({
-        device: device,
-        format: canvasFormat,
-    });
+    try {
+        debugLog('Starting initialization...');
 
-    // Update canvas size to match display size
-    function updateCanvasSize() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-    }
-    updateCanvasSize();
-
-    // Segway orientation state
-    let orientation = {
-        side: 0,
-        front: 0
-    };
-
-    // Segway movement
-    function orientationToSpeed(orientation) {
-        const deadzone = 15;
-        const maxSpeedAngle = 45;
-        let forward = 0;
-        if (Math.abs(orientation.front) > deadzone) {
-            // Map orientation angle to speed -1 to 1 based on percentage between deadzone and maxSpeedAngle
-            forward = -(orientation.front - Math.sign(orientation.front) * deadzone) / (maxSpeedAngle - deadzone);
+        // Check WebGPU support
+        if (!navigator.gpu) {
+            debugLog('ERROR: WebGPU is not supported in this browser');
+            return;
         }
-        return forward;
-    }
 
-    // Device orientation permission (for iOS Safari)
-    const requestButton = document.getElementById('request-orientation');
+        debugLog('WebGPU available, requesting adapter...');
+        const gpu = navigator.gpu;
+        const adapter = await gpu.requestAdapter();
+        if (!adapter) {
+            debugLog('ERROR: Failed to get WebGPU adapter');
+            return;
+        }
+        debugLog('Adapter obtained, requesting device...');
+        const device = await adapter.requestDevice();
+        debugLog('Device obtained successfully');
+        const canvas = document.getElementById('my-canvas');
+        debugLog('Getting WebGPU context...');
+        const context = canvas.getContext('webgpu');
+        if (!context) {
+            debugLog('ERROR: Failed to get WebGPU context');
+            return;
+        }
+        debugLog('Context obtained, configuring canvas...');
+        const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
+        context.configure({
+            device: device,
+            format: canvasFormat,
+        });
+        debugLog('Canvas configured successfully');
 
-    // Check if permission is needed (iOS 13+)
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // Update canvas size to match display size
+        function updateCanvasSize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        updateCanvasSize();
+
+        // Segway orientation state
+        let orientation = {
+            side: 0,
+            front: 0
+        };
+
+        // Segway movement
+        function orientationToSpeed(orientation) {
+            const deadzone = 15;
+            const maxSpeedAngle = 45;
+            let forward = 0;
+            if (Math.abs(orientation.front) > deadzone) {
+                // Map orientation angle to speed -1 to 1 based on percentage between deadzone and maxSpeedAngle
+                forward = -(orientation.front - Math.sign(orientation.front) * deadzone) / (maxSpeedAngle - deadzone);
+            }
+            return forward;
+        }
+
+        // Device orientation permission (for iOS Safari)
+        const requestButton = document.getElementById('request-orientation');
+
+        // CdebugLog('iOS device detected, showing permission button');
         requestButton.style.display = 'block';
         requestButton.addEventListener('click', async () => {
             try {
+                debugLog('Requesting device orientation permission...');
                 const permission = await DeviceOrientationEvent.requestPermission();
+                debugLog('Permission result: ' + permission);
                 if (permission === 'granted') {
                     requestButton.style.display = 'none';
                     window.addEventListener('deviceorientation', handleOrientation);
+                    debugLog('Device orientation enabled');
                 } else {
-                    alert('Permission denied for device orientation');
+                    debugLog('ERROR: Permission denied for device orientation');
                 }
             } catch (error) {
-                console.error('Error requesting device orientation permission:', error);
+                debugLog('ERROR requesting permission: ' + error.message);
             }
         });
     } else {
         // Non-iOS devices or older iOS versions
+        debugL
+        // Non-iOS devices or older iOS versions
+        console.log('Adding device orientation listener (non-iOS)');
         window.addEventListener('deviceorientation', handleOrientation);
     }
 
@@ -814,10 +853,19 @@ async function main() {
     }
 
     // Start render loop
+    debugLog('Starting render loop...');
     requestAnimationFrame(animate);
+    debugLog('✓ Application initialized successfully!');
+} catch (error) {
+    debugLog('FATAL ERROR: ' + error.message);
+    debugLog('Stack: ' + error.stack);
+}
 }
 
-window.onload = function () { main(); }
+window.onload = function () {
+    debugLog('Page loaded, starting main...');
+    main();
+}
 
 
 // Converts DeviceOrientation angles to rotation matrix
