@@ -37,8 +37,30 @@ async function main() {
         return forward;
     }
 
-    // Device orientation
-    window.addEventListener('deviceorientation', handleOrientation);
+    // Device orientation permission (for iOS Safari)
+    const requestButton = document.getElementById('request-orientation');
+
+    // Check if permission is needed (iOS 13+)
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        requestButton.style.display = 'block';
+        requestButton.addEventListener('click', async () => {
+            try {
+                const permission = await DeviceOrientationEvent.requestPermission();
+                if (permission === 'granted') {
+                    requestButton.style.display = 'none';
+                    window.addEventListener('deviceorientation', handleOrientation);
+                } else {
+                    alert('Permission denied for device orientation');
+                }
+            } catch (error) {
+                console.error('Error requesting device orientation permission:', error);
+            }
+        });
+    } else {
+        // Non-iOS devices or older iOS versions
+        window.addEventListener('deviceorientation', handleOrientation);
+    }
+
     function handleOrientation(event) {
         const { alpha, beta, gamma } = event;
         const { forward, right, up } = getEulerAngles(getRotationMatrix(alpha, beta, gamma));
