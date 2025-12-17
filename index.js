@@ -8,6 +8,15 @@ function debugLog(message) {
         const time = new Date().toLocaleTimeString();
         debugDiv.innerHTML += `[${time}] ${message}<br>`;
         debugDiv.scrollTop = debugDiv.scrollHeight;
+    } else {
+        // If debug div doesn't exist, create a simple alert div
+        const body = document.body;
+        if (body) {
+            const alertDiv = document.createElement('div');
+            alertDiv.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; background: red; color: white; padding: 10px; z-index: 9999; font-size: 14px;';
+            alertDiv.textContent = 'DEBUG DIV NOT FOUND: ' + message;
+            body.appendChild(alertDiv);
+        }
     }
 }
 
@@ -863,7 +872,19 @@ async function main() {
 }
 
 window.onload = function () {
+    const statusDiv = document.getElementById('status-message');
+    if (statusDiv) {
+        statusDiv.textContent = 'Page loaded! Starting app...';
+    }
     debugLog('Page loaded, starting main...');
+
+    // Hide status message after app starts
+    setTimeout(() => {
+        if (statusDiv && navigator.gpu) {
+            statusDiv.style.display = 'none';
+        }
+    }, 2000);
+
     main();
 }
 
