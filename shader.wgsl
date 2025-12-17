@@ -31,17 +31,13 @@ fn main_vs_texture(@location(0) inPos: vec4f, @location(1) texCoord: vec2f, @loc
 @fragment
 fn main_fs_texture(@location(0) texCoords: vec2f, @location(2) inPos: vec4f) -> @location(0) vec4f {
     let texColor = textureSample(ourTexture, ourSampler, texCoords);
-    let distanceToEye = length(vec3f(uniforms.eye.x, 0, uniforms.eye.z) - (uniforms.model * inPos).xyz);
-
-    // Fog parameters
-    let startFogDistance: f32 = 0.5;
-    let fullFogDistance: f32 = 6.5;
-
-    // Calculate fog factor [0.0 - 1.0] based on distance
-    let fogFactor = clamp((distanceToEye - startFogDistance) / (fullFogDistance - startFogDistance), 0.0, 1.0);
-
-    // Mix the texture color with fog color (black) based on fog factor
-    let fogColor: vec4f = vec4f(0.0, 0.0, 0.0, 1.0);
+    let distance = length(uniforms.eye - (uniforms.model * inPos).xyz);
+    // The distance at which the fog starts appearing
+    const fogStart: f32 = 0.5;
+    // The distance where the fog has full effect
+    const fogFull: f32 = 6.5;
+    const fogColor: vec4f = vec4f(0.0, 0.0, 0.0, 1.0);
+    let fogFactor = clamp((distance - fogStart) / (fogFull - fogStart), 0.0, 1.0);
     let finalColor = mix(texColor, fogColor, fogFactor);
     return finalColor;
 }
