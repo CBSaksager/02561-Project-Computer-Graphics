@@ -874,73 +874,88 @@ async function main() {
 window.onload = function () {
     const statusDiv = document.getElementById('status-message');
     if (statusDiv) {
-        statusDiv.textContent = 'Page loaded! Starting app...';
+        statusDiv.textContent = 'Page loaded! Checking WebGPU support...';
     }
     debugLog('Page loaded, starting main...');
+    debugLog('Checking for WebGPU support...');
+
+    // Check WebGPU support immediately
+    if (!navigator.gpu) {
+        debugLog('❌ ERROR: WebGPU is NOT supported on this browser/device');
+        if (statusDiv) {
+            statusDiv.innerHTML = 'ERROR: WebGPU is not supported<br>This app requires a browser with WebGPU support<br>iOS Safari does not currently support WebGPU';
+            statusDiv.style.background = 'rgba(255, 0, 0, 0.95)';
+            statusDiv.style.color = 'white';
+        }
+        return;
+    }
+
+    debugLog('✓ WebGPU is available');
+    if (statusDiv) {
+        statusDiv.textContent = 'WebGPU found! Starting initialization...';
+    }
 
     // Hide status message after app starts
     setTimeout(() => {
-        if (statusDiv && navigator.gpu) {
+        if (statusDiv) {
             statusDiv.style.display = 'none';
         }
-    }, 2000);
-
-    main();
-}
+    }, 3000);
 
 
-// Converts DeviceOrientation angles to rotation matrix
-// Based on snippet from https://w3c.github.io/deviceorientation/#example-76d62ad0
-// Apapted based on https://stackoverflow.com/questions/69216465/the-simplest-way-to-solve-gimbal-lock-when-using-deviceorientation-events-in-jav
-function getRotationMatrix(alpha, beta, gamma) {
-    const degtorad = Math.PI / 180; // Degree-to-Radian conversion
-    var cX = Math.cos(beta * degtorad);
-    var cY = Math.cos(gamma * degtorad);
-    var cZ = Math.cos(alpha * degtorad);
-    var sX = Math.sin(beta * degtorad);
-    var sY = Math.sin(gamma * degtorad);
-    var sZ = Math.sin(alpha * degtorad);
+    // Converts DeviceOrientation angles to rotation matrix
+    // Based on snippet from https://w3c.github.io/deviceorientation/#example-76d62ad0
+    // Apapted based on https://stackoverflow.com/questions/69216465/the-simplest-way-to-solve-gimbal-lock-when-using-deviceorientation-events-in-jav
+    function getRotationMatrix(alpha, beta, gamma) {
+        const degtorad = Math.PI / 180; // Degree-to-Radian conversion
+        var cX = Math.cos(beta * degtorad);
+        var cY = Math.cos(gamma * degtorad);
+        var cZ = Math.cos(alpha * degtorad);
+        var sX = Math.sin(beta * degtorad);
+        var sY = Math.sin(gamma * degtorad);
+        var sZ = Math.sin(alpha * degtorad);
 
-    var m11 = cZ * cY - sZ * sX * sY;
-    var m12 = - cX * sZ;
-    var m13 = cY * sZ * sX + cZ * sY;
+        var m11 = cZ * cY - sZ * sX * sY;
+        var m12 = - cX * sZ;
+        var m13 = cY * sZ * sX + cZ * sY;
 
-    var m21 = cY * sZ + cZ * sX * sY;
-    var m22 = cZ * cX;
-    var m23 = sZ * sY - cZ * cY * sX;
+        var m21 = cY * sZ + cZ * sX * sY;
+        var m22 = cZ * cX;
+        var m23 = sZ * sY - cZ * cY * sX;
 
-    var m31 = - cX * sY;
-    var m32 = sX;
-    var m33 = cX * cY;
+        var m31 = - cX * sY;
+        var m32 = sX;
+        var m33 = cX * cY;
 
-    return [
-        m13, m11, m12,
-        m23, m21, m22,
-        m33, m31, m32
-    ];
-};
-
-// Converts rotation matrix to Euler angles
-// Based on https://learnopencv.com/rotation-matrix-to-euler-angles/
-// Apapted based on https://stackoverflow.com/questions/69216465/the-simplest-way-to-solve-gimbal-lock-when-using-deviceorientation-events-in-jav
-function getEulerAngles(matrix) {
-    var radtodeg = 180 / Math.PI; // Radian-to-Degree conversion
-    var sy = Math.sqrt(matrix[0] * matrix[0] + matrix[3] * matrix[3]);
-
-    var singular = sy < 1e-6; // If
-
-    if (!singular) {
-        var x = Math.atan2(matrix[7], matrix[8]);
-        var y = Math.atan2(-matrix[6], sy);
-        var z = Math.atan2(matrix[3], matrix[0]);
-    } else {
-        var x = Math.atan2(-matrix[5], matrix[4]);
-        var y = Math.atan2(-matrix[6], sy);
-        var z = 0;
-    }
-    return {
-        forward: radtodeg * x,
-        right: radtodeg * y,
-        up: radtodeg * z
+        return [
+            m13, m11, m12,
+            m23, m21, m22,
+            m33, m31, m32
+        ];
     };
+
+    // Converts rotation matrix to Euler angles
+    // Based on https://learnopencv.com/rotation-matrix-to-euler-angles/
+    // Apapted based on https://stackoverflow.com/questions/69216465/the-simplest-way-to-solve-gimbal-lock-when-using-deviceorientation-events-in-jav
+    function getEulerAngles(matrix) {
+        var radtodeg = 180 / Math.PI; // Radian-to-Degree conversion
+        var sy = Math.sqrt(matrix[0] * matrix[0] + matrix[3] * matrix[3]);
+
+        var singular = sy < 1e-6; // If
+
+        if (!singular) {
+            var x = Math.atan2(matrix[7], matrix[8]);
+            var y = Math.atan2(-matrix[6], sy);
+            var z = Math.atan2(matrix[3], matrix[0]);
+        } else {
+            var x = Math.atan2(-matrix[5], matrix[4]);
+            var y = Math.atan2(-matrix[6], sy);
+            var z = 0;
+        }
+        return {
+            forward: radtodeg * x,
+            right: radtodeg * y,
+            up: radtodeg * z
+        };
+    }
 }
